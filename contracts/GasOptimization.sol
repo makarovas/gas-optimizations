@@ -306,3 +306,77 @@ contract GasOptimization9 {
         }
     }
 }
+
+
+
+/**
+
+ The expensiveFunction uses Solidity's built-in push function to append each value in _data to myArray. The cheapFunction, on the other hand, uses inline assembly to append the values to a memory array instead of a storage array, which can be more efficient in terms of gas usage.
+
+The cheapFunction first loads the length of myArray and computes a pointer to the end of the array in memory. It then uses inline assembly to loop over each value in _data, using the mload instruction to load each uint256 value from memory and store it in the appropriate position in the memory array. Finally, it updates the length of myArray in storage using the sstore instruction.
+
+ */
+
+
+contract GasOptimization10 {
+    uint256[] private myArray;
+
+    function expensiveFunction(uint256[] memory _data) public {
+        for (uint256 i = 0; i < _data.length; i++) {
+            myArray.push(_data[i]);
+        }
+    }
+
+    function cheapFunction(uint256[] memory _data) public {
+        uint256 length = myArray.length;
+        assembly {
+            let ptr := add(msize(), 1)
+            for { let i := 0 } lt(i, mload(_data)) { i := add(i, 1) } {
+                mstore(add(ptr, mul(add(length, i), 32)), mload(add(_data, mul(i, 32))))
+            }
+            sstore(add(keccak256(abi.encodePacked(myArray)), 1), add(length, mload(_data)))
+        }
+    }
+}
+
+
+/**
+
+The expensiveFunction uses standard Solidity syntax to perform these operations in a loop, while the cheapFunction uses inline assembly to optimize the operations and reduce gas costs.
+
+The cheapFunction first loads the input values into memory using the mstore instruction, and then uses inline assembly to perform the same series of operations as the expensiveFunction. However, instead of using separate Solidity statements for each operation, the cheapFunction combines multiple operations into a single inline assembly block. This reduces the number of Solidity instructions and results in lower gas costs.
+
+ */
+contract GasOptimization11 {
+    function expensiveFunction(uint256 a, uint256 b, uint256 c) public pure returns (uint256) {
+        uint256 result;
+        for (uint256 i = 0; i < 100; i++) {
+            result += a + b + c;
+            result *= 2;
+            result -= c * b;
+        }
+        return result;
+    }
+
+    function cheapFunction(uint256 a, uint256 b, uint256 c) public pure returns (uint256) {
+        uint256 result;
+        assembly {
+            let ptr := mload(0x40)
+            mstore(ptr, a)
+            mstore(add(ptr, 32), b)
+            mstore(add(ptr, 64), c)
+            for { let i := 0 } lt(i, 100) { i := add(i, 1) } {
+                let x := mload(ptr)
+                let y := mload(add(ptr, 32))
+                let z := mload(add(ptr, 64))
+                x := add(x, y)
+                x := add(x, z)
+                x := mul(x, 2)
+                x := sub(x, mul(y, z))
+                mstore(ptr, x)
+            }
+            result := mload(ptr)
+        }
+        return result;
+    }
+}
