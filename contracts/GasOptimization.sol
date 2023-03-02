@@ -230,6 +230,79 @@ contract GasOptimization7 {
 }
 
 
+/**
+
+Almost similar GasOptimization2 example, but uses a combination of Solidity and inline assembly code to optimize gas usage. The cheapFunction first loads the length of the array and a pointer to its data using Solidity's built-in memory layout. It then iterates over the array using inline assembly, using the mload instruction to load each uint256 value from memory and add it to the sum. Finally, it returns the sum using Solidity's built-in return mechanism.
+
+This approach provides the benefits of both Solidity and inline assembly: it is more efficient than the for loop in terms of gas usage, but still uses Solidity's memory layout and return mechanism, making it easier to read and write than pure inline assembly code.
 
 
 
+ */
+
+
+
+contract GasOptimization8 {
+    function expensiveFunction(uint256[] memory _data) public pure returns (uint256) {
+        uint256 sum = 0;
+        for (uint256 i = 0; i < _data.length; i++) {
+            sum += _data[i];
+        }
+        return sum;
+    }
+
+    function cheapFunction(uint256[] memory _data) public pure returns (uint256) {
+        uint256 sum = 0;
+
+        assembly {
+            let len := mload(_data)
+            let data := add(_data, 32)
+
+            for { let end := add(data, mul(len, 32)) } lt(data, end) { data := add(data, 32) } {
+                sum := add(sum, mload(data))
+            }
+        }
+
+        return sum;
+    }
+}
+
+
+/**
+
+The expensiveFunction uses Solidity's built-in storage keyword to load the MyStruct into memory, update its fields, and store it back to storage. The cheapFunction, on the other hand, uses inline assembly to directly manipulate storage, which can be more efficient in terms of gas usage.
+
+The cheapFunction first computes the storage slot for the caller's MyStruct using the keccak256 hash function. It then uses inline assembly to store the four uint256 values directly to storage at the computed slot. Note that this approach requires a fixed layout for the MyStruct to ensure that the values are stored in the correct order.
+
+ */
+
+contract GasOptimization9 {
+    struct MyStruct {
+        uint256 value1;
+        uint256 value2;
+        uint256 value3;
+        uint256 value4;
+    }
+
+    mapping(address => MyStruct) private myStructs;
+
+    function expensiveFunction() public {
+        MyStruct storage myStruct = myStructs[msg.sender];
+        myStruct.value1 += 1;
+        myStruct.value2 += 2;
+        myStruct.value3 += 3;
+        myStruct.value4 += 4;
+    }
+
+    function cheapFunction() public {
+        bytes32 slot = keccak256(abi.encodePacked(msg.sender));
+        assembly {
+            let ptr := add(msize(), 1)
+            sstore(slot, ptr)
+            mstore(ptr, 1)
+            mstore(add(ptr, 32), 2)
+            mstore(add(ptr, 64), 3)
+            mstore(add(ptr, 96), 4)
+        }
+    }
+}
